@@ -36,3 +36,5 @@ subjectSchema.index({ name: 1 });
 
 export const Subject = mongoose.model<ISubject>('Subject', subjectSchema);
 
+
+

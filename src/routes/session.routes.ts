@@ -5,7 +5,8 @@ import {
   getMySessions,
   getSessionById,
   updateSessionStatus,
-  getAllSessions
+  getAllSessions,
+  getUnavailableSlots
 } from '../controllers/session.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validation.middleware';
@@ -34,6 +35,7 @@ const updateSessionValidation = [
 router.post('/', validate(createSessionValidation), createSession);
 router.get('/my-sessions', getMySessions);
 router.get('/all', authorize(UserRole.ADMIN), getAllSessions);
+router.get('/unavailable-slots', getUnavailableSlots);
 router.get('/:id', getSessionById);
 router.patch('/:id', validate(updateSessionValidation), authorize(UserRole.ADMIN), updateSessionStatus);
 

@@ -28,6 +28,31 @@ export const createSession = asyncHandler(async (req: AuthRequest, res: Response
     return;
   }
 
+  // Check if the slot is already booked (approved sessions with assigned teachers)
+  const requestedDate = new Date(sessionDate);
+  const startOfDay = new Date(requestedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(requestedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const conflictingSession = await Session.findOne({
+    status: SessionStatus.APPROVED,
+    teacherId: { $exists: true, $ne: null },
+    sessionDate: {
+      $gte: startOfDay,
+      $lte: endOfDay
+    },
+    sessionTime: sessionTime
+  });
+
+  if (conflictingSession) {
+    res.status(409).json({
+      success: false,
+      message: 'This time slot is already booked and unavailable. Please choose another time.'
+    } as ApiResponse);
+    return;
+  }
+
   const session = await Session.create({
     studentId: userId,
     subjectId,
@@ -196,6 +221,59 @@ export const getAllSessions = asyncHandler(async (req: AuthRequest, res: Respons
   res.json({
     success: true,
     data: sessions
+  } as ApiResponse);
+});
+
+export const getUnavailableSlots = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+  const { date } = req.query;
+
+  if (!date) {
+    res.status(400).json({
+      success: false,
+      message: 'Date parameter is required'
+    } as ApiResponse);
+    return;
+  }
+
+  // Validate date format
+  const requestedDate = new Date(date as string);
+  if (isNaN(requestedDate.getTime())) {
+    res.status(400).json({
+      success: false,
+      message: 'Invalid date format'
+    } as ApiResponse);
+    return;
+  }
+
+  // Set time to start of day for accurate comparison
+  const startOfDay = new Date(requestedDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(requestedDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Find all approved sessions with assigned teachers on this date
+  const bookedSessions = await Session.find({
+    status: SessionStatus.APPROVED,
+    teacherId: { $exists: true, $ne: null },
+    sessionDate: {
+      $gte: startOfDay,
+      $lte: endOfDay
+    }
+  })
+    .select('sessionTime')
+    .lean();
+
+  // Extract unique unavailable time slots
+  const unavailableSlots = Array.from(new Set(
+    bookedSessions.map(session => session.sessionTime).filter(Boolean)
+  ));
+
+  res.json({
+    success: true,
+    data: {
+      date: date,
+      unavailableSlots: unavailableSlots
+    }
   } as ApiResponse);
 });
 
